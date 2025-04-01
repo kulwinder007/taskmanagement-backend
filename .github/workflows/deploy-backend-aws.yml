@@ -1,0 +1,83 @@
+name: Build and Deploy backend
+
+on:
+  push:
+    branches:
+      - main  # Trigger on push to the main branch
+  pull_request:
+    branches:
+      - main  # Trigger on PR to the main branch
+
+env:
+  AWS_REGION: us-east-1  # Set the AWS Region for your ECR repository
+  ECR_REPO1: taskmanager-backend-auth_service  # Specify the ECR repository name for auth_service
+  ECR_REPO2: taskmanager-backend-task_service  # Specify the ECR repository name for task_Service
+  IMAGE_TAG: latest  # Specify the tag for the Docker image
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest  # Using ubuntu-latest for compatibility
+    environment: AWS-ECR
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Cache Docker layers to speed up build times
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      # Configure AWS Credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Log in to Amazon ECR
+      - name: Log in to Amazon ECR
+        run: |
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+
+      # Build Docker image for auth_service
+      - name: Build Docker Image - auth_service
+        run: |
+          docker build -t ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/taskmanager-backend-auth_service:${{ github.sha }} .
+
+      # Build Docker image for task_service
+      - name: Build Docker Image - task_service
+        run: |
+          docker build -t ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/taskmanager-backend-task_service:${{ github.sha }} .
+
+      # Tag Docker image for auth_service
+      - name: Tag Docker Image - auth_service
+        run: |
+          docker tag ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/taskmanager-backend-auth_service:${{ github.sha }} ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/taskmanager-frontend:latest
+
+      # Tag Docker image for task_service
+      - name: Tag Docker Image - task_service
+        run: |
+          docker tag ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/taskmanager-backend-task_service:${{ github.sha }} ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/taskmanager-frontend:latest
+         
+
+      # Push Docker image to ECR for auth_service
+      - name: Build and Push Docker auth - auth_service
+        run: |
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/taskmanager-backend-auth_service:${{ github.sha }}
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/taskmanager-backend-auth_service:latest
+
+
+      # Push Docker image to ECR for task_service
+      - name: Build and Push Docker Image - task_service
+        run: |
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/taskmanager-backend-task_service:${{ github.sha }}
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/taskmanager-backend-task_service:latest
