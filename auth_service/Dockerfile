@@ -18,7 +18,7 @@ ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
 
 # Expose the port the app runs on (typically Flask runs on port 5000)
-EXPOSE 5000
+EXPOSE 5001
 
 # Start the Flask application
-CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]
+CMD ["flask", "run", "--host=0.0.0.0", "--port=5001"]
